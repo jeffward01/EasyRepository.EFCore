@@ -14,6 +14,27 @@ using Microsoft.Extensions.DependencyInjection;
 
 internal partial class Repository
 {
+    [Obsolete("The boolean option for 'asNoTracking' is obsolete. Please use the Enum.EfTrackingOptions method instead of the boolean version.")]
+    public async Task<TProjected> GetSingleAsync<TEntity, TProjected, TFilter>(
+        bool asNoTracking, TFilter filter, Expression<Func<TEntity, TProjected>> projectExpression,
+        Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>> includeExpression, CancellationToken cancellationToken = default)
+        where TEntity : class
+        where TFilter : class
+    {
+        
+        var filterService = this._serviceProvider.GetRequiredService<IPagingFilterStrategy<TEntity, TFilter, TEntity>>();
+
+        var queryable = this.FindQueryable<TEntity>(asNoTracking);
+
+        queryable = filterService.ApplyFilter(queryable, filter);
+        
+        queryable = includeExpression(queryable);
+
+        return await queryable.Select(projectExpression)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public int Count<TEntity, TFilter>(TFilter filter)
         where TEntity : class
         where TFilter : class
@@ -26,76 +47,79 @@ internal partial class Repository
                 filter)
             .Count();
     }
-    
-     public async Task<int> CountAsync<TEntity, TFilter>(TFilter filter, CancellationToken cancellationToken = default)
+
+    public async Task<int> CountAsync<TEntity, TFilter>(TFilter filter, CancellationToken cancellationToken = default)
         where TEntity : class
         where TFilter : class
     {
-        
         var filterService = this._serviceProvider.GetRequiredService<IPagingFilterStrategy<TEntity, TFilter, TFilter>>();
 
-        var count =  await filterService.ApplyFilter(
+        var count = await filterService.ApplyFilter(
                 this._context.Set<TEntity>()
                     .AsQueryable(),
                 filter)
-            .CountAsync(cancellationToken: cancellationToken);
-        
+            .CountAsync(cancellationToken);
+
         return count;
     }
-     
 
-     public async Task<TProjected> GetSingleAsync<TEntity, TProjected, TFilter>(
-         EfTrackingOptions asNoTracking, TFilter filter, Expression<Func<TEntity, TProjected>> projectExpression,
-         Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>> includeExpression, CancellationToken cancellationToken = default)
-         where TEntity : class
-         where TFilter : class
-     {
-         var filterService = this._serviceProvider.GetRequiredService<IPagingFilterStrategy<TEntity, TFilter, TEntity>>();
-         
-         var queryable = this.FindQueryable<TEntity>(asNoTracking);
 
-         queryable = filterService.ApplyFilter(queryable, filter);
-         
-         queryable = includeExpression(queryable);
+    public async Task<TProjected> GetSingleAsync<TEntity, TProjected, TFilter>(
+        EfTrackingOptions asNoTracking, TFilter filter, Expression<Func<TEntity, TProjected>> projectExpression,
+        Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>> includeExpression, CancellationToken cancellationToken = default)
+        where TEntity : class
+        where TFilter : class
+    {
+        var filterService = this._serviceProvider.GetRequiredService<IPagingFilterStrategy<TEntity, TFilter, TEntity>>();
 
-         return await queryable.Select(projectExpression)
-             .FirstOrDefaultAsync(cancellationToken)
-             .ConfigureAwait(false);
-     }
-     
-     
-     /// <inheritdoc />
-     public async Task<List<TProjected>> GetMultipleAsync<TEntity, TFilter, TProjected>(
-         EfTrackingOptions asNoTracking, TFilter filter, Expression<Func<TEntity, TProjected>> projectExpression,
-         Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>> includeExpression, CancellationToken cancellationToken = default)
-         where TEntity : class
-         where TFilter : class
-     {
-         var queryable = this.FindQueryable<TEntity>(asNoTracking)
-             .ApplyFilter(filter);
-         queryable = includeExpression(queryable);
+        var queryable = this.FindQueryable<TEntity>(asNoTracking);
 
-         return await queryable.Select(projectExpression)
-             .ToListAsync(cancellationToken)
-             .ConfigureAwait(false);
-     }
+        queryable = filterService.ApplyFilter(queryable, filter);
 
-     /// <inheritdoc />
-     public List<TProjected> GetMultiple<TEntity, TFilter, TProjected>(
-         EfTrackingOptions asNoTracking, TFilter filter, Expression<Func<TEntity, TProjected>> projectExpression,
-         Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>> includeExpression)
-         where TEntity : class
-         where TFilter : class
-     {
-         var queryable = this.FindQueryable<TEntity>(asNoTracking)
-             .ApplyFilter(filter);
-         queryable = includeExpression(queryable);
+        queryable = includeExpression(queryable);
 
-         return queryable.Select(projectExpression)
-             .ToList();
-     }
-     
-     
+        return await queryable.Select(projectExpression)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+
+    /// <inheritdoc />
+    public async Task<List<TProjected>> GetMultipleAsync<TEntity, TFilter, TProjected>(
+        EfTrackingOptions asNoTracking, TFilter filter, Expression<Func<TEntity, TProjected>> projectExpression,
+        Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>> includeExpression, CancellationToken cancellationToken = default)
+        where TEntity : class
+        where TFilter : class
+    {
+        var filterService = this._serviceProvider.GetRequiredService<IPagingFilterStrategy<TEntity, TFilter, TEntity>>();
+
+        var queryable = this.FindQueryable<TEntity>(asNoTracking);
+
+        queryable = filterService.ApplyFilter(queryable, filter);
+
+        queryable = includeExpression(queryable);
+
+        return await queryable.Select(projectExpression)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public List<TProjected> GetMultiple<TEntity, TFilter, TProjected>(
+        EfTrackingOptions asNoTracking, TFilter filter, Expression<Func<TEntity, TProjected>> projectExpression,
+        Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>> includeExpression)
+        where TEntity : class
+        where TFilter : class
+    {
+        var queryable = this.FindQueryable<TEntity>(asNoTracking)
+            .ApplyFilter(filter);
+        queryable = includeExpression(queryable);
+
+        return queryable.Select(projectExpression)
+            .ToList();
+    }
+
+
     [Obsolete("The boolean option for 'asNoTracking' is obsolete. Please use the Enum.EfTrackingOptions method instead of the boolean version.")]
     public List<TEntity> GetMultiple<TEntity, TFilter>(bool asNoTracking, TFilter filter)
         where TEntity : class
@@ -272,8 +296,8 @@ internal partial class Repository
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
     }
-    
-    
+
+
     /// <inheritdoc />
     public TProjected GetSingle<TEntity, TProjected, TFilter>(
         EfTrackingOptions asNoTracking, TFilter filter, Expression<Func<TEntity, TProjected>> projectExpression,
@@ -304,7 +328,7 @@ internal partial class Repository
             .FirstOrDefault();
     }
 
-     [Obsolete("The boolean option for 'asNoTracking' is obsolete. Please use the Enum.EfTrackingOptions method instead of the boolean version.")]
+    [Obsolete("The boolean option for 'asNoTracking' is obsolete. Please use the Enum.EfTrackingOptions method instead of the boolean version.")]
     public TEntity GetSingle<TEntity, TFilter>(bool asNoTracking, TFilter filter)
         where TEntity : class
         where TFilter : class
@@ -457,22 +481,4 @@ internal partial class Repository
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
     }
-
-
-    [Obsolete("The boolean option for 'asNoTracking' is obsolete. Please use the Enum.EfTrackingOptions method instead of the boolean version.")]
-    public async Task<TProjected> GetSingleAsync<TEntity, TProjected, TFilter>(
-        bool asNoTracking, TFilter filter, Expression<Func<TEntity, TProjected>> projectExpression,
-        Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>> includeExpression, CancellationToken cancellationToken = default)
-        where TEntity : class
-        where TFilter : class
-    {
-        var queryable = this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter);
-        queryable = includeExpression(queryable);
-
-        return await queryable.Select(projectExpression)
-            .FirstOrDefaultAsync(cancellationToken)
-            .ConfigureAwait(false);
-    }
-
 }

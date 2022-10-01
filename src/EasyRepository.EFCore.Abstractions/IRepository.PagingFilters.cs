@@ -40,5 +40,5 @@ public partial interface IRepository
         bool asNoTracking, TFilter filter, Expression<Func<TEntity, TProjected>> projectExpression,
         Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>> includeExpression, CancellationToken cancellationToken = default)
         where TEntity : class
-        where TFilter : FilterBase;
+        where TFilter : class;
 }
