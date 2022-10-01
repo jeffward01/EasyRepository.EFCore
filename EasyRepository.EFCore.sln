@@ -22,6 +22,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EasyRepository.EFCore.Abstr
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyRepository.EFCore.Ardalis.Specification", "src\EasyRepository.EFCore.Ardalis.Specification\EasyRepository.EFCore.Ardalis.Specification.csproj", "{2DBA6C0F-2C4B-4516-A7C6-AF322B37834B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyRepository.EfCore.AutoFilterer", "src\EasyRepository.EfCore.AutoFilterer\EasyRepository.EfCore.AutoFilterer.csproj", "{86218B21-9DB5-414E-B032-62F322F15DEE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -80,6 +82,18 @@ Global
 		{2DBA6C0F-2C4B-4516-A7C6-AF322B37834B}.Release|x64.Build.0 = Release|Any CPU
 		{2DBA6C0F-2C4B-4516-A7C6-AF322B37834B}.Release|x86.ActiveCfg = Release|Any CPU
 		{2DBA6C0F-2C4B-4516-A7C6-AF322B37834B}.Release|x86.Build.0 = Release|Any CPU
+		{86218B21-9DB5-414E-B032-62F322F15DEE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{86218B21-9DB5-414E-B032-62F322F15DEE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{86218B21-9DB5-414E-B032-62F322F15DEE}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{86218B21-9DB5-414E-B032-62F322F15DEE}.Debug|x64.Build.0 = Debug|Any CPU
+		{86218B21-9DB5-414E-B032-62F322F15DEE}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{86218B21-9DB5-414E-B032-62F322F15DEE}.Debug|x86.Build.0 = Debug|Any CPU
+		{86218B21-9DB5-414E-B032-62F322F15DEE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{86218B21-9DB5-414E-B032-62F322F15DEE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{86218B21-9DB5-414E-B032-62F322F15DEE}.Release|x64.ActiveCfg = Release|Any CPU
+		{86218B21-9DB5-414E-B032-62F322F15DEE}.Release|x64.Build.0 = Release|Any CPU
+		{86218B21-9DB5-414E-B032-62F322F15DEE}.Release|x86.ActiveCfg = Release|Any CPU
+		{86218B21-9DB5-414E-B032-62F322F15DEE}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -89,6 +103,7 @@ Global
 		{84940E1B-6A42-4485-82DC-4EE105B637AA} = {1670C5F3-D8A7-42DB-A377-5405F1B4BCE6}
 		{F3046DA7-D0EA-4A6E-A633-969B13E4EB5B} = {6ECD69C4-213C-400A-8EFE-DB1B5E33DC29}
 		{2DBA6C0F-2C4B-4516-A7C6-AF322B37834B} = {6ECD69C4-213C-400A-8EFE-DB1B5E33DC29}
+		{86218B21-9DB5-414E-B032-62F322F15DEE} = {6ECD69C4-213C-400A-8EFE-DB1B5E33DC29}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {82B432B5-EED3-42E9-AFEC-D899479E4CC3}

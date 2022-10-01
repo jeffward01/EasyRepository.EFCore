@@ -9,17 +9,20 @@ using System.Threading;
 using System.Threading.Tasks;
 using Abstractions;
 using Abstractions.Enums;
-using AutoFilterer.Extensions;
-using AutoFilterer.Types;
+using Abstractions.PagingFilters;
 using Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
+using PagingFilters;
 
 /// <summary>
 ///     This class contains implementations of repository functions
 /// </summary>
-internal sealed class Repository : IRepository
+internal sealed partial class Repository : IRepository
 {
+
+    private readonly IServiceProvider _serviceProvider;
+
     private readonly DbContext _context;
     // public event Action<DbContext> SavingChanges = _ => { };
 
@@ -29,9 +32,12 @@ internal sealed class Repository : IRepository
     /// <param name="context">
     ///     Database Context <see cref="DbContext" />
     /// </param>
-    public Repository(DbContext context)
+    /// <param name="serviceProvider">The service provider container.
+    /// <para>This is used to resolve the generic implementations of <b>filters</b> and <b>paging</b></para></param>
+    public Repository(DbContext context, IServiceProvider serviceProvider)
     {
         this._context = context;
+        this._serviceProvider = serviceProvider;
     }
 
     public TEntity Add<TEntity>(TEntity entity)
@@ -159,14 +165,6 @@ internal sealed class Repository : IRepository
         return count;
     }
 
-    public int Count<TEntity, TFilter>(TFilter filter)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        return this._context.Set<TEntity>()
-            .ApplyFilter(filter)
-            .Count();
-    }
 
     public async Task<int> CountAsync<TEntity>(CancellationToken cancellationToken = default)
         where TEntity : class
@@ -178,21 +176,12 @@ internal sealed class Repository : IRepository
         return count;
     }
 
-    public async Task<int> CountAsync<TEntity, TFilter>(TFilter filter, CancellationToken cancellationToken = default)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        var count = await this._context.Set<TEntity>()
-            .ApplyFilter(filter)
-            .CountAsync(cancellationToken)
-            .ConfigureAwait(false);
-
-        return count;
-    }
+   
 
     public void Complete()
     {
         this._context.SaveChanges();
+  
     }
 
 
@@ -202,21 +191,7 @@ internal sealed class Repository : IRepository
             .ConfigureAwait(false);
     }
 
-    /// <inheritdoc />
-    public async Task<TProjected> GetSingleAsync<TEntity, TProjected, TFilter>(
-        EfTrackingOptions asNoTracking, TFilter filter, Expression<Func<TEntity, TProjected>> projectExpression,
-        Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>> includeExpression, CancellationToken cancellationToken = default)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        var queryable = this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter);
-        queryable = includeExpression(queryable);
 
-        return await queryable.Select(projectExpression)
-            .FirstOrDefaultAsync(cancellationToken)
-            .ConfigureAwait(false);
-    }
 
     public void HardDelete<TEntity>(TEntity entity)
         where TEntity : class
@@ -446,22 +421,6 @@ internal sealed class Repository : IRepository
         return entities;
     }
 
-    /// <inheritdoc />
-    public async Task<List<TProjected>> GetMultipleAsync<TEntity, TFilter, TProjected>(
-        EfTrackingOptions asNoTracking, TFilter filter, Expression<Func<TEntity, TProjected>> projectExpression,
-        Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>> includeExpression, CancellationToken cancellationToken = default)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        var queryable = this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter);
-        queryable = includeExpression(queryable);
-
-        return await queryable.Select(projectExpression)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-    }
-
     public IQueryable<TEntity> GetQueryable<TEntity>()
         where TEntity : class
     {
@@ -507,20 +466,7 @@ internal sealed class Repository : IRepository
             .ToList();
     }
 
-    /// <inheritdoc />
-    public List<TProjected> GetMultiple<TEntity, TFilter, TProjected>(
-        EfTrackingOptions asNoTracking, TFilter filter, Expression<Func<TEntity, TProjected>> projectExpression,
-        Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>> includeExpression)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        var queryable = this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter);
-        queryable = includeExpression(queryable);
-
-        return queryable.Select(projectExpression)
-            .ToList();
-    }
+ 
 
     [Obsolete("The boolean option for 'asNoTracking' is obsolete. Please use the Enum.EfTrackingOptions method instead of the boolean version.")]
     public async Task<List<TEntity>> GetMultipleAsync<TEntity>(bool asNoTracking, CancellationToken cancellationToken = default)
@@ -817,183 +763,6 @@ internal sealed class Repository : IRepository
     }
 
     [Obsolete("The boolean option for 'asNoTracking' is obsolete. Please use the Enum.EfTrackingOptions method instead of the boolean version.")]
-    public List<TEntity> GetMultiple<TEntity, TFilter>(bool asNoTracking, TFilter filter)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        return this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter)
-            .ToList();
-    }
-
-    /// <inheritdoc />
-    public List<TEntity> GetMultiple<TEntity, TFilter>(EfTrackingOptions asNoTracking, TFilter filter)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        return this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter)
-            .ToList();
-    }
-
-    [Obsolete("The boolean option for 'asNoTracking' is obsolete. Please use the Enum.EfTrackingOptions method instead of the boolean version.")]
-    public async Task<List<TEntity>> GetMultipleAsync<TEntity, TFilter>(bool asNoTracking, TFilter filter, CancellationToken cancellationToken = default)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        return await this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-    }
-
-    /// <inheritdoc />
-    public async Task<List<TEntity>> GetMultipleAsync<TEntity, TFilter>(EfTrackingOptions asNoTracking, TFilter filter, CancellationToken cancellationToken = default)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        return await this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-    }
-
-    [Obsolete("The boolean option for 'asNoTracking' is obsolete. Please use the Enum.EfTrackingOptions method instead of the boolean version.")]
-    public List<TEntity> GetMultiple<TEntity, TFilter>(bool asNoTracking, TFilter filter, Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>> includeExpression)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        var queryable = this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter);
-        queryable = includeExpression(queryable);
-
-        return queryable.ToList();
-    }
-
-    /// <inheritdoc />
-    public List<TEntity> GetMultiple<TEntity, TFilter>(EfTrackingOptions asNoTracking, TFilter filter, Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>> includeExpression)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        var queryable = this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter);
-        queryable = includeExpression(queryable);
-
-        return queryable.ToList();
-    }
-
-    [Obsolete("The boolean option for 'asNoTracking' is obsolete. Please use the Enum.EfTrackingOptions method instead of the boolean version.")]
-    public async Task<List<TEntity>> GetMultipleAsync<TEntity, TFilter>(
-        bool asNoTracking, TFilter filter, Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>> includeExpression,
-        CancellationToken cancellationToken = default)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        var queryable = this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter);
-        queryable = includeExpression(queryable);
-
-        return await queryable.ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-    }
-
-    /// <inheritdoc />
-    public async Task<List<TEntity>> GetMultipleAsync<TEntity, TFilter>(
-        EfTrackingOptions asNoTracking, TFilter filter, Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>> includeExpression,
-        CancellationToken cancellationToken = default)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        var queryable = this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter);
-        queryable = includeExpression(queryable);
-
-        return await queryable.ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-    }
-
-    [Obsolete("The boolean option for 'asNoTracking' is obsolete. Please use the Enum.EfTrackingOptions method instead of the boolean version.")]
-    public List<TProjected> GetMultiple<TEntity, TFilter, TProjected>(bool asNoTracking, TFilter filter, Expression<Func<TEntity, TProjected>> projectExpression)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        return this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter)
-            .Select(projectExpression)
-            .ToList();
-    }
-
-    /// <inheritdoc />
-    public List<TProjected> GetMultiple<TEntity, TFilter, TProjected>(EfTrackingOptions asNoTracking, TFilter filter, Expression<Func<TEntity, TProjected>> projectExpression)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        return this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter)
-            .Select(projectExpression)
-            .ToList();
-    }
-
-    [Obsolete("The boolean option for 'asNoTracking' is obsolete. Please use the Enum.EfTrackingOptions method instead of the boolean version.")]
-    public async Task<List<TProjected>> GetMultipleAsync<TEntity, TFilter, TProjected>(
-        bool asNoTracking, TFilter filter, Expression<Func<TEntity, TProjected>> projectExpression,
-        CancellationToken cancellationToken = default)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        return await this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter)
-            .Select(projectExpression)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-    }
-
-    /// <inheritdoc />
-    public async Task<List<TProjected>> GetMultipleAsync<TEntity, TFilter, TProjected>(
-        EfTrackingOptions asNoTracking, TFilter filter, Expression<Func<TEntity, TProjected>> projectExpression,
-        CancellationToken cancellationToken = default)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        return await this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter)
-            .Select(projectExpression)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-    }
-
-    [Obsolete("The boolean option for 'asNoTracking' is obsolete. Please use the Enum.EfTrackingOptions method instead of the boolean version.")]
-    public List<TProjected> GetMultiple<TEntity, TFilter, TProjected>(
-        bool asNoTracking, TFilter filter, Expression<Func<TEntity, TProjected>> projectExpression,
-        Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>> includeExpression)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        var queryable = this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter);
-        queryable = includeExpression(queryable);
-
-        return queryable.Select(projectExpression)
-            .ToList();
-    }
-
-    [Obsolete("The boolean option for 'asNoTracking' is obsolete. Please use the Enum.EfTrackingOptions method instead of the boolean version.")]
-    public async Task<List<TProjected>> GetMultipleAsync<TEntity, TFilter, TProjected>(
-        bool asNoTracking, TFilter filter, Expression<Func<TEntity, TProjected>> projectExpression,
-        Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>> includeExpression, CancellationToken cancellationToken = default)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        var queryable = this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter);
-        queryable = includeExpression(queryable);
-
-        return await queryable.Select(projectExpression)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-    }
-
-    [Obsolete("The boolean option for 'asNoTracking' is obsolete. Please use the Enum.EfTrackingOptions method instead of the boolean version.")]
     public TEntity GetSingle<TEntity>(bool asNoTracking, Expression<Func<TEntity, bool>> whereExpression)
         where TEntity : class
     {
@@ -1013,35 +782,7 @@ internal sealed class Repository : IRepository
         return queryable.FirstOrDefault();
     }
 
-    /// <inheritdoc />
-    public TProjected GetSingle<TEntity, TProjected, TFilter>(
-        EfTrackingOptions asNoTracking, TFilter filter, Expression<Func<TEntity, TProjected>> projectExpression,
-        Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>> includeExpression)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        var queryable = this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter);
-        queryable = includeExpression(queryable);
-
-        return queryable.Select(projectExpression)
-            .FirstOrDefault();
-    }
-
-    [Obsolete("The boolean option for 'asNoTracking' is obsolete. Please use the Enum.EfTrackingOptions method instead of the boolean version.")]
-    public TProjected GetSingle<TEntity, TProjected, TFilter>(
-        bool asNoTracking, TFilter filter, Expression<Func<TEntity, TProjected>> projectExpression,
-        Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>> includeExpression)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        var queryable = this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter);
-        queryable = includeExpression(queryable);
-
-        return queryable.Select(projectExpression)
-            .FirstOrDefault();
-    }
+  
 
     [Obsolete("The boolean option for 'asNoTracking' is obsolete. Please use the Enum.EfTrackingOptions method instead of the boolean version.")]
     public async Task<TEntity> GetSingleAsync<TEntity>(bool asNoTracking, Expression<Func<TEntity, bool>> whereExpression, CancellationToken cancellationToken = default)
@@ -1219,181 +960,12 @@ internal sealed class Repository : IRepository
             .ConfigureAwait(false);
     }
 
-    [Obsolete("The boolean option for 'asNoTracking' is obsolete. Please use the Enum.EfTrackingOptions method instead of the boolean version.")]
-    public TEntity GetSingle<TEntity, TFilter>(bool asNoTracking, TFilter filter)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        var queryable = this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter);
-
-        return queryable.FirstOrDefault();
-    }
-
-    /// <inheritdoc />
-    public TEntity GetSingle<TEntity, TFilter>(EfTrackingOptions asNoTracking, TFilter filter)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        var queryable = this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter);
-
-        return queryable.FirstOrDefault();
-    }
-
-    [Obsolete("The boolean option for 'asNoTracking' is obsolete. Please use the Enum.EfTrackingOptions method instead of the boolean version.")]
-    public async Task<TEntity> GetSingleAsync<TEntity, TFilter>(bool asNoTracking, TFilter filter, CancellationToken cancellationToken = default)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        var queryable = this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter);
-
-        return await queryable.FirstOrDefaultAsync(cancellationToken)
-            .ConfigureAwait(false);
-    }
-
-    /// <inheritdoc />
-    public async Task<TEntity> GetSingleAsync<TEntity, TFilter>(EfTrackingOptions asNoTracking, TFilter filter, CancellationToken cancellationToken = default)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        var queryable = this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter);
-
-        return await queryable.FirstOrDefaultAsync(cancellationToken)
-            .ConfigureAwait(false);
-    }
-
-    [Obsolete("The boolean option for 'asNoTracking' is obsolete. Please use the Enum.EfTrackingOptions method instead of the boolean version.")]
-    public TEntity GetSingle<TEntity, TFilter>(bool asNoTracking, TFilter filter, Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>> includeExpression)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        var queryable = this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter);
-        queryable = includeExpression(queryable);
-
-        return queryable.FirstOrDefault();
-    }
-
-    /// <inheritdoc />
-    public TEntity GetSingle<TEntity, TFilter>(EfTrackingOptions asNoTracking, TFilter filter, Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>> includeExpression)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        var queryable = this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter);
-        queryable = includeExpression(queryable);
-
-        return queryable.FirstOrDefault();
-    }
-
-    [Obsolete("The boolean option for 'asNoTracking' is obsolete. Please use the Enum.EfTrackingOptions method instead of the boolean version.")]
-    public async Task<TEntity> GetSingleAsync<TEntity, TFilter>(
-        bool asNoTracking, TFilter filter, Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>> includeExpression,
-        CancellationToken cancellationToken = default)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        var queryable = this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter);
-        queryable = includeExpression(queryable);
-
-        return await queryable.FirstOrDefaultAsync(cancellationToken)
-            .ConfigureAwait(false);
-    }
-
-    /// <inheritdoc />
-    public async Task<TEntity> GetSingleAsync<TEntity, TFilter>(
-        EfTrackingOptions asNoTracking, TFilter filter, Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>> includeExpression,
-        CancellationToken cancellationToken = default)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        var queryable = this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter);
-        queryable = includeExpression(queryable);
-
-        return await queryable.FirstOrDefaultAsync(cancellationToken)
-            .ConfigureAwait(false);
-    }
-
-    [Obsolete("The boolean option for 'asNoTracking' is obsolete. Please use the Enum.EfTrackingOptions method instead of the boolean version.")]
-    public TProjected GetSingle<TEntity, TProjected, TFilter>(bool asNoTracking, TFilter filter, Expression<Func<TEntity, TProjected>> projectExpression)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        var queryable = this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter);
-
-        return queryable.Select(projectExpression)
-            .FirstOrDefault();
-    }
-
-    /// <inheritdoc />
-    public TProjected GetSingle<TEntity, TProjected, TFilter>(EfTrackingOptions asNoTracking, TFilter filter, Expression<Func<TEntity, TProjected>> projectExpression)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        var queryable = this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter);
-
-        return queryable.Select(projectExpression)
-            .FirstOrDefault();
-    }
-
-    [Obsolete("The boolean option for 'asNoTracking' is obsolete. Please use the Enum.EfTrackingOptions method instead of the boolean version.")]
-    public async Task<TProjected> GetSingleAsync<TEntity, TProjected, TFilter>(
-        bool asNoTracking, TFilter filter, Expression<Func<TEntity, TProjected>> projectExpression,
-        CancellationToken cancellationToken = default)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        var queryable = this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter);
-
-        return await queryable.Select(projectExpression)
-            .FirstOrDefaultAsync(cancellationToken)
-            .ConfigureAwait(false);
-    }
-
-    /// <inheritdoc />
-    public async Task<TProjected> GetSingleAsync<TEntity, TProjected, TFilter>(
-        EfTrackingOptions asNoTracking, TFilter filter, Expression<Func<TEntity, TProjected>> projectExpression,
-        CancellationToken cancellationToken = default)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        var queryable = this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter);
-
-        return await queryable.Select(projectExpression)
-            .FirstOrDefaultAsync(cancellationToken)
-            .ConfigureAwait(false);
-    }
-
-
-    [Obsolete("The boolean option for 'asNoTracking' is obsolete. Please use the Enum.EfTrackingOptions method instead of the boolean version.")]
-    public async Task<TProjected> GetSingleAsync<TEntity, TProjected, TFilter>(
-        bool asNoTracking, TFilter filter, Expression<Func<TEntity, TProjected>> projectExpression,
-        Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>> includeExpression, CancellationToken cancellationToken = default)
-        where TEntity : class
-        where TFilter : FilterBase
-    {
-        var queryable = this.FindQueryable<TEntity>(asNoTracking)
-            .ApplyFilter(filter);
-        queryable = includeExpression(queryable);
-
-        return await queryable.Select(projectExpression)
-            .FirstOrDefaultAsync(cancellationToken)
-            .ConfigureAwait(false);
-    }
-
+    
     [Obsolete("The boolean option for 'asNoTracking' is obsolete. Please use the Enum.EfTrackingOptions method instead of the boolean version.")]
     public TEntity GetById<TEntity>(bool asNoTracking, object id)
         where TEntity : class
     {
+        // I was not sure why the 'asNoTracking' option was not applied. Perhaps it was a bug? 
         return this._context.Set<TEntity>()
             .FirstOrDefault(this.GenerateExpression<TEntity>(id));
     }
@@ -1402,6 +974,7 @@ internal sealed class Repository : IRepository
     public TEntity GetById<TEntity>(EfTrackingOptions asNoTracking, object id)
         where TEntity : class
     {
+        // Now this uses the 'asNoTracking' option
         var queryable = this.FindQueryable<TEntity>(asNoTracking)
             .FirstOrDefault(this.GenerateExpression<TEntity>(id));
 
@@ -1594,14 +1167,28 @@ internal sealed class Repository : IRepository
 
     private Expression<Func<TEntity, bool>> GenerateExpression<TEntity>(object id)
     {
+        
+        // Type might be null
         var type = this._context.Model.FindEntityType(typeof(TEntity));
+        
+        
+        // Type might be null.. If this is not 'caught' then it will throw NullReference Error.
+        // Instead... We can 'catch' the Null Reference Error and then throw an error such as:
+        // EasyRepositoryTypeNotFoundException : Exception
+        // Message: The Type TypeOf(TEntity).Name was not found, please ensure it exists within the DBContext model as a registered
+        // DbSet<TEntity>.
+        //---- This is a change in favor of being 'explicit'.
         var pk = type.FindPrimaryKey()
             .Properties.Select(s => s.Name)
             .FirstOrDefault();
+        
+        
+        // Type might also be null here
         var pkType = type.FindPrimaryKey()
             .Properties.Select(p => p.ClrType)
             .FirstOrDefault();
 
+        // PkType might be null here also
         var value = Convert.ChangeType(id, pkType, CultureInfo.InvariantCulture);
 
         var pe = Expression.Parameter(typeof(TEntity), "entity");
